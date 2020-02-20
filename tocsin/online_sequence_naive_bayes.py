@@ -24,6 +24,8 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         else:
             self.mask_sequence = None
 
+        self.min_motif_score = self._get_min_motif_score()
+
     @staticmethod
     def _prepare_sequences(file_, max_motif_score, filter_sequence,
                            max_read_length=100,
@@ -76,14 +78,8 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         # WARNING set up to persist counts through multiple fits
         # assumes that each file contains a single class
 
-        # TODO make this check better later (create validation methods)
-        assert len(X_files) == len(file_labels)
-        if sample_weights is None:
-            sample_weights = np.ones(len(X_files))
-        else:
-            assert len(sample_weights) == len(X_files)
-
-        self.min_motif_score = self._get_min_motif_score()
+        sample_weights = self._validate_sample_weights(X_files, file_labels,
+                                                       sample_weights)
 
         total_start = time.time()
         for i, (file_, label, weight) in enumerate(
@@ -91,22 +87,13 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
             print('----------------------------')
             print('Starting training iteration {}...'.format(i))
             start = time.time()
-            # update coutns for label with counts form X_files
+            # update counts for label with counts form X_files
             matching_sequences = self._prepare_sequences(
-                file_,
-                self.min_motif_score,
-                self.filter_sequence,
-                zipped=zipped,
-                max_read_length=max_read_length,
+                file_, self.min_motif_score, self.filter_sequence,
+                zipped=zipped, max_read_length=max_read_length,
                 )
-            counts = tf.reduce_sum(matching_sequences, axis=0)
-            if weight != 1:
-                counts = tf.scalar_mul(weight, counts)
-            # potential for not liking it when adding two tensors...
-            if label not in self.counts:
-                self.counts[label] = counts
-            else:
-                self.counts[label] = tf.math.add(self.counts[label], counts)
+
+            self._update_counts(matching_sequences, label, weight)
             end = time.time()
             print('Done. {:.2f}s\tTotal: {:.2f}s'.format(end - start,
                                                          end - total_start))
@@ -115,6 +102,26 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         self.classes_ = np.array(list(self.counts.keys()))
         print('----------------------------')
         return self
+
+    def _update_counts(self, matching_sequences, label, weight):
+        counts = tf.reduce_sum(matching_sequences, axis=0)
+        if weight != 1:
+            counts = tf.scalar_mul(weight, counts)
+        # potential for not liking it when adding two tensors...
+        if label not in self.counts:
+            self.counts[label] = counts
+        else:
+            self.counts[label] = tf.math.add(self.counts[label], counts)
+
+    @staticmethod
+    def _validate_sample_weights(X_files, file_labels, sample_weights):
+        # TODO make this check better later (create validation methods)
+        assert len(X_files) == len(file_labels)
+        if sample_weights is None:
+            sample_weights = np.ones(len(X_files))
+        else:
+            assert len(sample_weights) == len(X_files)
+        return sample_weights
 
     def _get_min_motif_score(self):
         max_motif_score = sum(letter is not 'N' for letter in
