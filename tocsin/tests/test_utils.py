@@ -1,10 +1,11 @@
 from tocsin.tests.testing import TocsinTestCase
 from tocsin.utils import (
     load_fastq_tf, encode_dna, dna_encode_bit_manipulation,
-    find_matching_sequences, encode_dna_str
+    find_matching_sequences, encode_dna_str, SliceTensor
 )
 import numpy as np
 from numpy.testing import assert_array_equal
+import tensorflow as tf
 
 
 class TestLoadFastqTF(TocsinTestCase):
@@ -130,3 +131,42 @@ class TestFindMatchingSequences(TocsinTestCase):
         exp_05 = encode_dna_str('AGC')
         assert_array_equal(exp_04, matches[0])
         assert_array_equal(exp_05, matches[1])
+
+
+class TestCounts(TocsinTestCase):
+
+    def test_getitem(self):
+        c = SliceTensor()
+        c._index = {'blah': 0, 'nah': 1}
+        # TODO make more general
+        c.data = tf.constant([[0, 1, 2], [5, 3, 4]])
+        assert_array_equal(c[0], [0, 1, 2])
+        assert_array_equal(c[1], [5, 3, 4])
+        assert_array_equal(c[:, 0], [0, 5])
+        assert_array_equal(c['blah'], [0, 1, 2])
+        assert_array_equal(c['nah'], [5, 3, 4])
+
+    def test_setitem(self):
+        c = SliceTensor()
+        c['entry0'] = tf.constant([[0, 1], [1, 0]])
+        assert_array_equal(c['entry0'], [[0, 1], [1, 0]])
+        assert_array_equal(c[0], [[0, 1], [1, 0]])
+        c['entry1'] = tf.constant([[1, 5], [1, 0]])
+        assert_array_equal(c['entry1'], [[1, 5], [1, 0]])
+        assert_array_equal(c[1], [[1, 5], [1, 0]])
+        assert_array_equal(c[:, 0, :], [[0, 1], [1, 5]])
+
+        c['entry1'] += tf.constant([[2, 2], [2, 6]])
+        assert_array_equal(c[1], [[3, 7], [3, 6]])
+
+        c[1] += tf.constant([[2, 2], [2, 6]])
+        assert_array_equal(c[1], [[5, 9], [5, 12]])
+
+        # TODO
+        c[[1, 0], 0] += tf.constant([[[1, 1]], [[1, 1]]])
+        assert_array_equal(c[1], [[5, 9], [5, 12]])
+
+    def test_membersip(self):
+        c = SliceTensor()
+        c['entry0'] = tf.constant([[0, 1], [1, 0]])
+        self.assertTrue('entry0' in c)

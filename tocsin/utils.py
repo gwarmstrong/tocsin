@@ -144,3 +144,92 @@ def identity_filter(filter_seq):
         identity_filter_[i, :, i] = tf.range(4)
     identity_filter_ = tf.cast(tf.constant(identity_filter_), tf.float32)
     return identity_filter_
+
+
+class SliceTensor:
+
+    def __init__(self):
+        self._index = dict()
+        self.n_categories = 0
+        # TODO make more general
+        self.data = None
+
+    def __len__(self):
+        if self.data is None:
+            return 0
+        else:
+            return len(self.data)
+
+    def __contains__(self, item):
+        return item in self._index
+
+    @property
+    def index(self):
+        # returns the index sorted by the order of classes in counts tensor
+        return list(sorted(self._index.keys(), key=lambda item: self._index[
+            item]))
+
+    def __getitem__(self, key):
+        index_as_array = isinstance(key, tuple) or isinstance(key, int)
+        if index_as_array:
+            return self.data[key]
+        else:
+            # relies on _index storing the location of the key in data
+            index = self._index[key]
+            return self.data[index]
+
+    def __setitem__(self, key, value):
+        if isinstance(key, tuple):
+            # TODO assert that you can index data like this
+            # TODO index the data
+            print(type(key))
+            raise NotImplemented()
+        elif isinstance(key, int):
+            # TODO validate that this is a valid index
+            # TODO index the data
+            self._set_index(key, value)
+        # can index data by key name and change value in it
+        elif key in self._index:
+            index = self._index[key]
+            # new_data = tf.math.add(self.data[index], value)
+            self._set_index(index, value)
+        # the case if data does not exist already
+        else:
+            # TODO for now assert that value has same dimensions as a slice
+            #  of existing data
+            if self.data is not None:
+                value = self._validate_new_data(value)
+                # add a new slice to data
+                self.data = tf.concat([self.data, value], 0)
+            else:
+                # create data based on this value
+                self.data = tf.expand_dims(value, 0)
+
+            self._index[key] = self.n_categories
+            self.n_categories += 1
+
+    def _set_index(self, index, new_value):
+        to_stack = []
+        for i, current_value in enumerate(self.data):
+            if i == index:
+                to_stack.append(new_value)
+            else:
+                to_stack.append(current_value)
+        self.data = tf.stack(to_stack)
+
+    def _validate_new_data(self, value):
+        exp_shape = self.data[0, :].shape
+        if value.shape != exp_shape:
+            raise ValueError(f"Expected new value to have shape {exp_shape}. "
+                             f"Got {value.shape}.")
+        return tf.expand_dims(value, 0)
+
+
+if __name__ == "__main__":
+    c = SliceTensor()
+    print(c[0])
+    print(c[:, 0])
+    # c[0, 1, 2]
+    print(c['blah'])
+    print(c['nah'])
+
