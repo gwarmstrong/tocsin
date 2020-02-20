@@ -162,9 +162,9 @@ class TestCounts(TocsinTestCase):
         c[1] += tf.constant([[2, 2], [2, 6]])
         assert_array_equal(c[1], [[5, 9], [5, 12]])
 
-        # TODO
-        c[[1, 0], 0] += tf.constant([[[1, 1]], [[1, 1]]])
-        assert_array_equal(c[1], [[5, 9], [5, 12]])
+        # # TODO
+        # c[[1, 0], 0] += tf.constant([[[1, 1]], [[1, 1]]])
+        # assert_array_equal(c[1], [[5, 9], [5, 12]])
 
     def test_membersip(self):
         c = SliceTensor()

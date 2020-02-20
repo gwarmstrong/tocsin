@@ -148,11 +148,23 @@ def identity_filter(filter_seq):
 
 class SliceTensor:
 
-    def __init__(self):
-        self._index = dict()
-        self.n_categories = 0
-        # TODO make more general
-        self.data = None
+    def __init__(self, data=None):
+        if data is None:
+            self._index = dict()
+            self.n_categories = 0
+            # TODO make more general
+            self.data = None
+        else:
+            # TODO brittle asumption data is passed correctly
+            index, n, dat = data
+            self._index = index
+            self.n_categories = n
+            self.data = dat
+
+    def __repr__(self):
+        rep = f"SliceTensor(\n\tdata: {self.data}\n\tindex: " \
+              f"{self.index}\n\tn_categories: {self.n_categories}\n)"
+        return rep
 
     def __len__(self):
         if self.data is None:
@@ -162,6 +174,41 @@ class SliceTensor:
 
     def __contains__(self, item):
         return item in self._index
+
+    # def __add__(self, other):
+    #     if not isinstance(other, SliceTensor):
+    #         return SliceTensor((self._index,
+    #                             self.n_categories,
+    #                             tf.add(self.data, other)))
+    #     else:
+    #         # need to figure out adding _index and n_categories
+    #         raise NotImplemented()
+    #
+    # def __truediv__(self, other):
+    #     return SliceTensor((self._index,
+    #                         self.n_categories,
+    #                         tf.divide(self.data, other)
+    #                         ))
+
+    def tensor_op(self, op, *args, **kwargs):
+        return op(self.data, *args, **kwargs)
+
+    def slicetensor_op(self, op, *args, **kwargs):
+        """
+        like tensor op, but when shape is preserved
+
+        Parameters
+        ----------
+        op
+        args
+        kwargs
+
+        Returns
+        -------
+
+        """
+        return SliceTensor((self._index, self.n_categories,
+                            op(self.data, *args, **kwargs)))
 
     @property
     def index(self):
@@ -177,6 +224,11 @@ class SliceTensor:
             # relies on _index storing the location of the key in data
             index = self._index[key]
             return self.data[index]
+
+    def items(self):
+        for label, pos in self._index.items():
+            # TODO is there more efficient indexing?
+            yield ((label, pos), self[label])
 
     def __setitem__(self, key, value):
         if isinstance(key, tuple):

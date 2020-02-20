@@ -3,7 +3,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from sklearn.base import ClassifierMixin, BaseEstimator
-from tocsin.utils import load_fastq_tf, find_matching_sequences
+from tocsin.utils import load_fastq_tf, find_matching_sequences, SliceTensor
 
 
 class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
@@ -15,7 +15,7 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
     def __init__(self, filter_sequence, alpha=1.0,
                  motif_tolerance=0, mask=False, min_motif_score=None):
         self.alpha = 1.0
-        self.counts = dict()
+        self.counts = SliceTensor()
         self.filter_sequence = filter_sequence
         self.motif_tolerance = motif_tolerance
         self.mask = mask
@@ -99,7 +99,7 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
                                                          end - total_start))
 
         self._update_log_prob()
-        self.classes_ = np.array(list(self.counts.keys()))
+        self.classes_ = np.array(self.counts.index)
         print('----------------------------')
         return self
 
@@ -111,7 +111,7 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         if label not in self.counts:
             self.counts[label] = counts
         else:
-            self.counts[label] = tf.math.add(self.counts[label], counts)
+            self.counts[label] += counts
 
     @staticmethod
     def _validate_sample_weights(X_files, file_labels, sample_weights):
@@ -138,20 +138,31 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
                 self.counts}
 
     def _update_log_prob(self):
-        smoothed_counts = {label: tf.add(self.alpha, self.counts[label]) for
-                           label in self.counts}
-        cat_counts_by_class = {label: tf.reduce_sum(sc, axis=1, keepdims=True)
-                               for label, sc in smoothed_counts.items()}
-        self.probs = {label: tf.divide(smoothed_counts[label],
-                                       cat_counts_by_class[label])
-                      for label in smoothed_counts}
-        self.log_probs = {label: tf.math.log(prob) for label, prob in
-                          self.probs.items()}
+        # # TODONE remove __add__ in favor of tensor_op
+        # smoothed_counts = self.counts + self.alpha
+        smoothed_counts = self.counts.slicetensor_op(tf.add, self.alpha)
+        # cat_counts_by_class = tf.reduce_sum(smoothed_counts.data, axis=2,
+        #                                     keepdims=True)
+        cat_counts_by_class = smoothed_counts.tensor_op(tf.reduce_sum, axis=2,
+                                                        keepdims=True)
+
+        # # TODONE remove __truediv__ in favor of tesnor_op
+        # self.probs = smoothed_counts / cat_counts_by_class
+        self.probs = smoothed_counts.slicetensor_op(tf.divide,
+                                                    cat_counts_by_class)
+
+        # TODONE create __iter__ that gives label tensor pairs
+        # self.probs = {label: tf.divide(sc,
+        #                                cat_counts_by_class[pos])
+        #               for (label, pos), sc in smoothed_counts.items()}
+        # TODO create from_dict method to read in dict of key: tensor pairs
+        # # TODONE take log on data
+        # self.log_probs = {label: tf.math.log(prob) for (label, _), prob in
+        #                   self.probs.items()}
+        self.log_probs = self.probs.slicetensor_op(tf.math.log)
         if self.mask:
-            self.masked_log_probs = {
-                label: self._index_on_mask_sequence(log_prob) for
-                label, log_prob
-                in self.log_probs.items()}
+            self.masked_log_probs = self.log_probs.slicetensor_op(
+                tf.boolean_mask, self.mask_sequence, axis=1)
             return self.probs, self.log_probs, self.masked_log_probs
 
         return self.probs, self.log_probs
