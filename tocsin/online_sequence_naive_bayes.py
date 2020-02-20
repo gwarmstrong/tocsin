@@ -138,27 +138,13 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
                 self.counts}
 
     def _update_log_prob(self):
-        # # TODONE remove __add__ in favor of tensor_op
-        # smoothed_counts = self.counts + self.alpha
         smoothed_counts = self.counts.slicetensor_op(tf.add, self.alpha)
-        # cat_counts_by_class = tf.reduce_sum(smoothed_counts.data, axis=2,
-        #                                     keepdims=True)
         cat_counts_by_class = smoothed_counts.tensor_op(tf.reduce_sum, axis=2,
                                                         keepdims=True)
 
-        # # TODONE remove __truediv__ in favor of tesnor_op
-        # self.probs = smoothed_counts / cat_counts_by_class
         self.probs = smoothed_counts.slicetensor_op(tf.divide,
                                                     cat_counts_by_class)
 
-        # TODONE create __iter__ that gives label tensor pairs
-        # self.probs = {label: tf.divide(sc,
-        #                                cat_counts_by_class[pos])
-        #               for (label, pos), sc in smoothed_counts.items()}
-        # TODO create from_dict method to read in dict of key: tensor pairs
-        # # TODONE take log on data
-        # self.log_probs = {label: tf.math.log(prob) for (label, _), prob in
-        #                   self.probs.items()}
         self.log_probs = self.probs.slicetensor_op(tf.math.log)
         if self.mask:
             self.masked_log_probs = self.log_probs.slicetensor_op(

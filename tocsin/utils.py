@@ -175,21 +175,6 @@ class SliceTensor:
     def __contains__(self, item):
         return item in self._index
 
-    # def __add__(self, other):
-    #     if not isinstance(other, SliceTensor):
-    #         return SliceTensor((self._index,
-    #                             self.n_categories,
-    #                             tf.add(self.data, other)))
-    #     else:
-    #         # need to figure out adding _index and n_categories
-    #         raise NotImplemented()
-    #
-    # def __truediv__(self, other):
-    #     return SliceTensor((self._index,
-    #                         self.n_categories,
-    #                         tf.divide(self.data, other)
-    #                         ))
-
     def tensor_op(self, op, *args, **kwargs):
         return op(self.data, *args, **kwargs)
 
