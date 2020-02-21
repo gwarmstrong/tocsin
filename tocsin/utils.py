@@ -155,11 +155,19 @@ class SliceTensor:
             # TODO make more general
             self.data = None
         else:
-            # TODO brittle asumption data is passed correctly
+            # TODO brittle asumption data is passed correctly, convert to
+            #  kwargs
             index, n, dat = data
             self._index = index
             self.n_categories = n
             self.data = dat
+
+    @classmethod
+    def from_dict(cls, dict_):
+        n = len(dict_)
+        _index = {key: i for i, key in enumerate(dict_.keys())}
+        dat = tf.stack(list(dict_.values()))
+        return SliceTensor((_index, n, dat))
 
     def __repr__(self):
         rep = f"SliceTensor(\n\tdata: {self.data}\n\tindex: " \
@@ -180,7 +188,7 @@ class SliceTensor:
 
     def slicetensor_op(self, op, *args, **kwargs):
         """
-        like tensor op, but when shape is preserved
+        like tensor op, but when first dimension shape is preserved
 
         Parameters
         ----------
@@ -219,7 +227,7 @@ class SliceTensor:
         if isinstance(key, tuple):
             # TODO assert that you can index data like this
             # TODO index the data
-            print(type(key))
+            # print(type(key))
             raise NotImplemented()
         elif isinstance(key, int):
             # TODO validate that this is a valid index
@@ -260,13 +268,4 @@ class SliceTensor:
             raise ValueError(f"Expected new value to have shape {exp_shape}. "
                              f"Got {value.shape}.")
         return tf.expand_dims(value, 0)
-
-
-if __name__ == "__main__":
-    c = SliceTensor()
-    print(c[0])
-    print(c[:, 0])
-    # c[0, 1, 2]
-    print(c['blah'])
-    print(c['nah'])
 

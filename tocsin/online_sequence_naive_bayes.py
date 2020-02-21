@@ -134,8 +134,9 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         """
         For now this is just uniform prior...
         """
-        return {label: tf.math.log(1 / len(self.counts)).numpy() for label in
-                self.counts}
+        # set float32 because defaults to double but needs lower prec...
+        return {label: np.log(1 / len(self.counts), dtype=np.float32) for
+                label in self.counts.index}
 
     def _update_log_prob(self):
         smoothed_counts = self.counts.slicetensor_op(tf.add, self.alpha)
@@ -168,14 +169,30 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         else:
             log_probs = self.log_probs
 
-        jlls = {label: tf.multiply(X, log_probs[label]) for label in log_probs}
-        log_prior = self.class_log_prior_
-        jlls = {
-            label: tf.reduce_sum(jlls[label], axis=[1, 2]) + log_prior[label]
-            for label in jlls}
+        jlls = {label: tf.multiply(X, log_probs[label]) for label in
+                log_probs.index}
+
+        jlls = SliceTensor.from_dict(jlls)
+        # log_prior = self.class_log_prior_
+        # jlls2 = {
+        #     label: tf.reduce_sum(jlls[label], axis=[1, 2]) + log_prior[label]
+        #     for label in jlls.index}
+        # jlls2 = {
+        #     label: tf.add(tf.reduce_sum(jlls[label], axis=[1, 2]), log_prior[
+        #         label])
+        #     for label in jlls.index}
+        # print("JLL", jlls2)
+        # print("prior", log_prior)
+        log_prior = SliceTensor.from_dict(self.class_log_prior_)\
+            .tensor_op(tf.expand_dims, axis=1)
+        jlls = jlls.slicetensor_op(tf.reduce_sum, axis=[2, 3])
+        # print("JLL", jlls2)
+        # print("prior", log_prior)
+        jlls = jlls.slicetensor_op(tf.add, log_prior)
+
         return jlls
 
-    def predict_log_proba(self, X_files):
+    def predict_log_proba(self, X_files, zipped=True):
         """
         Depends on having been fit
         """
@@ -188,6 +205,7 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
             matching_sequences = self._prepare_sequences(file_,
                                                          self.min_motif_score,
                                                          self.filter_sequence,
+                                                         zipped=zipped,
                                                          )
             jlls = self._joint_log_likelihood(matching_sequences)
             jlls = tf.stack([jlls[class_] for class_ in self.classes_])
@@ -201,37 +219,39 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         # TODO may want to transpose eventually
         return log_probs
 
-    def predict_log_proba_file(self, X_files):
+    def predict_log_proba_file(self, X_files, zipped=True):
         """
         Returns a single probability for the whole file
         """
-        all_log_probs = self.predict_log_proba(X_files)
+        all_log_probs = self.predict_log_proba(X_files, zipped=zipped)
         return [tf.reduce_sum(log_proba, axis=1) for log_proba in
                 all_log_probs]
 
-    def predict_file(self, X_files):
+    def predict_file(self, X_files, zipped=True):
         """
         Returns a single class for the whole file
         """
-        all_log_probs_file = self.predict_log_proba_file(X_files)
+        all_log_probs_file = self.predict_log_proba_file(X_files,
+                                                         zipped=zipped)
+        # TODO fix __iter__ here
         arg_maxes = [tf.argmax(log_prob) for log_prob in all_log_probs_file]
         return [self.classes_[idx.numpy()] for idx in arg_maxes]
 
-    def predict_probab_file(self, X_files):
+    def predict_proba_file(self, X_files, zipped=True):
         # TODO kind of breaks the convention of the other methods
-        all_log_probs = self.predict_log_proba_file(X_files)
+        all_log_probs = self.predict_log_proba_file(X_files, zipped=zipped)
         tf_test_log_probs = tf.stack(all_log_probs)
         norm_factors = tf.reduce_logsumexp(tf_test_log_probs, axis=1,
                                            keepdims=True)
         probs = tf.exp(tf_test_log_probs - norm_factors)
         return probs
 
-    def predict_proba(self, X_files):
-        all_log_probs = self.predict_log_proba(X_files)
+    def predict_proba(self, X_files, zipped=True):
+        all_log_probs = self.predict_log_proba(X_files, zipped=zipped)
         return [tf.exp(log_prob) for log_prob in all_log_probs]
 
-    def predict(self, X_files):
-        all_log_probs = self.predict_log_proba(X_files)
+    def predict(self, X_files, zipped=True):
+        all_log_probs = self.predict_log_proba(X_files, zipped=zipped)
         max_indexes = [tf.argmax(log_prob, axis=0) for log_prob in
                        all_log_probs]
         return [self.classes_[idx.numpy()] for idx in max_indexes]
