@@ -9,6 +9,7 @@ setup(
         # 'tensorflow-probability',
         'scikit-learn>=0.22',
         'numpy',
+        'tqdm',
         # 'google-nucleus', # does not get installed on OSX
     ],
     long_description=open('README.md').read(),
