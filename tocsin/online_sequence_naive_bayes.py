@@ -221,11 +221,31 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
 
     def predict_log_proba_file(self, X_files, zipped=True):
         """
-        Returns a single probability for the whole file
+        Returns a total probability for each file in X_files
+
+        Parameters
+        ----------
+        X_files : iterable of file paths
+            each file in the list contains reads from
+        zipped : bool
+            indicates if the files passed in are zipped or not
+
+        Returns
+        -------
+
         """
         all_log_probs = self.predict_log_proba(X_files, zipped=zipped)
         return [tf.reduce_sum(log_proba, axis=1) for log_proba in
                 all_log_probs]
+
+    def predict_proba_file(self, X_files, zipped=True):
+        # TODO kind of breaks the convention of the other methods
+        all_log_probs = self.predict_log_proba_file(X_files, zipped=zipped)
+        tf_test_log_probs = tf.stack(all_log_probs)
+        norm_factors = tf.reduce_logsumexp(tf_test_log_probs, axis=1,
+                                           keepdims=True)
+        probs = tf.exp(tf_test_log_probs - norm_factors)
+        return probs
 
     def predict_file(self, X_files, zipped=True):
         """
@@ -236,15 +256,6 @@ class OnlineSequenceNB(ClassifierMixin, BaseEstimator):
         # TODO fix __iter__ here
         arg_maxes = [tf.argmax(log_prob) for log_prob in all_log_probs_file]
         return [self.classes_[idx.numpy()] for idx in arg_maxes]
-
-    def predict_proba_file(self, X_files, zipped=True):
-        # TODO kind of breaks the convention of the other methods
-        all_log_probs = self.predict_log_proba_file(X_files, zipped=zipped)
-        tf_test_log_probs = tf.stack(all_log_probs)
-        norm_factors = tf.reduce_logsumexp(tf_test_log_probs, axis=1,
-                                           keepdims=True)
-        probs = tf.exp(tf_test_log_probs - norm_factors)
-        return probs
 
     def predict_proba(self, X_files, zipped=True):
         all_log_probs = self.predict_log_proba(X_files, zipped=zipped)

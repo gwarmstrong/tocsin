@@ -1,0 +1,3 @@
+[submodule "fastp-bind"]
+	path = fastp-bind
+	url = https://github.com/gwarmstrong/fastp-bind.git

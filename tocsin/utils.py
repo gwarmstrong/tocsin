@@ -31,7 +31,6 @@ def load_fastq_tf(file_to_load, max_read_length=100, zipped=True):
 
     """
     start = time.time()
-    lines = []
 
     if zipped:
         loader = gzip.open
@@ -41,15 +40,17 @@ def load_fastq_tf(file_to_load, max_read_length=100, zipped=True):
         args = ('rb', )
     with loader(file_to_load, *args) as fp:
         all_lines = fp.readlines()
+    lines = []
     for i, line in enumerate(tqdm(all_lines)):
         if i % 4 == 1:
             bytes_ = line.rstrip()[:max_read_length]
             lines.append([byte_ for byte_ in bytes_])
 
-    demo_lines = encode_dna(lines)
+    # TODO should pull the lookup table out of encode_dna
+    ohe_lines = encode_dna(lines)
     end = time.time()
     print("Loaded FQ in: {:.4}s".format(end - start))
-    return demo_lines
+    return ohe_lines
 
 
 def encode_dna(ord_list):

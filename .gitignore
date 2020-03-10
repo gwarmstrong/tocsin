@@ -136,3 +136,7 @@ dmypy.json
 
 # idea files
 .idea/
+
+# benchmarks extras
+benchmarks/results/
+benchmarks/env
