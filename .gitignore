@@ -137,6 +137,9 @@ dmypy.json
 # idea files
 .idea/
 
+# mac stuff
+.DS_Store
+
 # benchmarks extras
 benchmarks/results/
 benchmarks/env
