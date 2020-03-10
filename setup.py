@@ -79,7 +79,7 @@ extensions = [Extension("tocsin.reader",
 
 if USE_CYTHON:
     from Cython.Build import cythonize
-    extensions = cythonize(extensions)
+    extensions = cythonize(extensions, force=True)
 
 setup(
     name='tocsin',
