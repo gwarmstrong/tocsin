@@ -14,6 +14,7 @@ fastp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 PREFIX = os.environ.get('PREFIX', "")
 
 CLEAN = True
+FORCE_COMPILE = True
 
 # https://stackoverflow.com/a/33308902/379593
 if sys.platform == 'darwin':
@@ -45,13 +46,13 @@ class build_ext(build_ext_orig):
 
     def run_compile_fastp(self):
         self.execute(compile_fastp, [], 'Compiling fastp')
-        if PREFIX:
-            self.copy_file(os.path.join(fastp_dir, 'libfastp.so'),
-                           os.path.join(PREFIX, 'lib/'))
+        # if PREFIX:
+        #     self.copy_file(os.path.join(fastp_dir, 'libfastp.so'),
+        #                    os.path.join(PREFIX, 'lib/'))
 
 
 if sys.platform == "darwin":
-    LINK_ARGS = ['-Wl,fastp-bind/libfastp.so']
+    LINK_ARGS = [] #['-Wl,-L./fastp-bind/libfastp.so']
 else:
     LINK_ARGS = []
 
@@ -73,13 +74,17 @@ extensions = [Extension("tocsin.reader",
                         language="c++",
                         extra_compile_args=["-std=c++11"],
                         extra_link_args=["-std=c++11"] + LINK_ARGS,
-                        library_dirs=["fastp-bind"],
+                        # library_dirs=[
+                        #               "./fastp-bind/",
+                        #               ],
                         # libraries=['fastp'],
                         )]
 
 if USE_CYTHON:
     from Cython.Build import cythonize
-    extensions = cythonize(extensions)
+    extensions = cythonize(extensions, force=FORCE_COMPILE,
+                           language="c++",
+                           )
 
 setup(
     name='tocsin',
